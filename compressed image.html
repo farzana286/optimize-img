@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Compressor & Resizer</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f0f5f5;
+      margin: 0;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      background: linear-gradient(145deg, #d4fef2, #f3fff9);
+      border-radius: 12px;
+      border: 3px solid #28a745; /* Green border */
+      box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+      padding: 30px 40px;
+      max-width: 500px;
+      width: 100%;
+    }
+
+    h2 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 25px;
+    }
+
+    label {
+      margin-top: 15px;
+      display: block;
+      font-weight: 600;
+      color: #333;
+    }
+
+    input[type="file"],
+    input[type="number"],
+    button {
+      width: 100%;
+      padding: 10px 12px;
+      margin-top: 6px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    input[type="file"] {
+      background: #fdfdfd;
+    }
+
+    button {
+      background-color: #28a745; /* Green button */
+      color: white;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s;
+      margin-top: 20px;
+    }
+
+    button:hover {
+      background-color: #218838;
+    }
+
+    canvas {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>Image Compressor & Resizer</h2>
+
+    <input type="file" id="imageInput" accept="image/*">
+
+    <label for="width">Width (px):</label>
+    <input type="number" id="width" placeholder="e.g. 800">
+
+    <label for="height">Height (px):</label>
+    <input type="number" id="height" placeholder="e.g. 600">
+
+    <label for="quality">Quality (0.1 to 1):</label>
+    <input type="number" id="quality" min="0.1" max="1" step="0.1" value="0.8">
+
+    <button onclick="compressImage()">Compress & Download</button>
+
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <script>
+    function compressImage() {
+      const input = document.getElementById('imageInput');
+      const targetWidth = parseInt(document.getElementById('width').value);
+      const targetHeight = parseInt(document.getElementById('height').value);
+      const qualityInput = parseFloat(document.getElementById('quality').value);
+
+      if (isNaN(qualityInput) || qualityInput < 0.1 || qualityInput > 1.0) {
+        alert("❌ Please enter a quality value between 0.1 and 1.0.");
+        return;
+      }
+
+      const quality = qualityInput;
+
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+
+      if (!input.files || !input.files[0]) {
+        alert('Please upload an image.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const img = new Image();
+        img.onload = function () {
+          const originalWidth = img.width;
+          const originalHeight = img.height;
+
+          const finalWidth = targetWidth || originalWidth;
+          const finalHeight = targetHeight || originalHeight;
+
+          let currentCanvas = document.createElement('canvas');
+          currentCanvas.width = originalWidth;
+          currentCanvas.height = originalHeight;
+          let currentCtx = currentCanvas.getContext('2d');
+          currentCtx.imageSmoothingEnabled = true;
+          currentCtx.imageSmoothingQuality = 'high';
+          currentCtx.drawImage(img, 0, 0);
+
+          let nextCanvas = currentCanvas;
+
+          if (finalWidth < originalWidth || finalHeight < originalHeight) {
+            while (nextCanvas.width * 0.5 > finalWidth && nextCanvas.height * 0.5 > finalHeight) {
+              const tempCanvas = document.createElement('canvas');
+              tempCanvas.width = nextCanvas.width * 0.5;
+              tempCanvas.height = nextCanvas.height * 0.5;
+              const tempCtx = tempCanvas.getContext('2d');
+              tempCtx.imageSmoothingEnabled = true;
+              tempCtx.imageSmoothingQuality = 'high';
+              tempCtx.drawImage(nextCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
+              nextCanvas = tempCanvas;
+            }
+          } else if (finalWidth > originalWidth || finalHeight > originalHeight) {
+            while (nextCanvas.width * 1.5 < finalWidth && nextCanvas.height * 1.5 < finalHeight) {
+              const tempCanvas = document.createElement('canvas');
+              tempCanvas.width = nextCanvas.width * 1.5;
+              tempCanvas.height = nextCanvas.height * 1.5;
+              const tempCtx = tempCanvas.getContext('2d');
+              tempCtx.imageSmoothingEnabled = true;
+              tempCtx.imageSmoothingQuality = 'high';
+              tempCtx.drawImage(nextCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
+              nextCanvas = tempCanvas;
+            }
+          }
+
+          canvas.width = finalWidth;
+          canvas.height = finalHeight;
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.clearRect(0, 0, finalWidth, finalHeight);
+          ctx.drawImage(nextCanvas, 0, 0, finalWidth, finalHeight);
+
+          canvas.toBlob(function (pngBlob) {
+            const pngUrl = URL.createObjectURL(pngBlob);
+            const imgReload = new Image();
+            imgReload.onload = () => {
+              canvas.width = finalWidth;
+              canvas.height = finalHeight;
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
+              ctx.clearRect(0, 0, finalWidth, finalHeight);
+              ctx.drawImage(imgReload, 0, 0, finalWidth, finalHeight);
+
+              canvas.toBlob(function (jpegBlob) {
+                if (jpegBlob) {
+                  const link = document.createElement('a');
+                  link.download = 'compressed-image.jpg';
+                  link.href = URL.createObjectURL(jpegBlob);
+                  link.click();
+                } else {
+                  alert('Compression failed. Try another image.');
+                }
+              }, 'image/jpeg', quality);
+            };
+            imgReload.src = pngUrl;
+          }, 'image/png');
+        };
+
+        img.onerror = () => alert('Invalid image file.');
+        img.src = e.target.result;
+      };
+
+      reader.readAsDataURL(input.files[0]);
+    }
+  </script>
+
+</body>
+</html>
